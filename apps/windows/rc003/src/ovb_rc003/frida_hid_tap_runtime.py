@@ -30,11 +30,11 @@ GADGET_ARCHIVE_NAME = "frida-gadget-17.15.3-windows-x86_64.dll.xz"
 GADGET_ARCHIVE_SHA256 = (
     "b566d70189b6d551ad8f4e0bea24de08a3d4c0f559bb35b2bdb67d45182240c2"
 )
-GADGET_DLL_NAME = "RemoteMicRC003HidTap.dll"
+GADGET_DLL_NAME = "RemoteMicRC003HidTapV4.dll"
 GADGET_DLL_SHA256 = (
     "6fca4007b2284c765a6c15c967a741f536b5865bf83867326a54029a3b752748"
 )
-GADGET_CONFIG_NAME = "RemoteMicRC003HidTap.config"
+GADGET_CONFIG_NAME = "RemoteMicRC003HidTapV4.config"
 GADGET_SCRIPT_NAME = "rc003_hid_gadget.js"
 HID_TAP_PORT = int(os.environ.get("REMOTE_MIC_RC003_HID_TAP_PORT", "30684"))
 
@@ -137,7 +137,8 @@ function installHook() {
       }
     },
     onLeave(retval) {
-      if (!this.capture || retval.toUInt32() !== 0 || this.output.isNull()) return;
+      if (!this.capture) return;
+      if (retval.toUInt32() !== 0 || this.output.isNull()) return;
       try {
         if (this.outputLength === EXPECTED_OUTPUT_LENGTH) {
           emit({
@@ -165,8 +166,12 @@ rpc.exports = {
   async init(_stage, parameters) {
     host = parameters.host || host;
     port = parameters.port || port;
-    installHook();
     await connectToHub();
+    try {
+      installHook();
+    } catch (error) {
+      emit({ kind: "error", message: String(error) });
+    }
   }
 };
 """.strip() + "\n"

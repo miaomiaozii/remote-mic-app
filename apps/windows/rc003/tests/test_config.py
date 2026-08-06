@@ -68,7 +68,7 @@ class DefaultConfigPrivacyTests(unittest.TestCase):
             loaded = config.load_config(path)
         self.assertEqual(loaded["voice_hotkey"], "win+h")
 
-    def test_load_repairs_recorded_left_ctrl_win_to_hold_mode(self):
+    def test_load_preserves_wechat_input_method_ctrl_win_and_infers_hold_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "config.json"
             path.write_text(
@@ -79,7 +79,7 @@ class DefaultConfigPrivacyTests(unittest.TestCase):
             )
             loaded = config.load_config(path)
         self.assertEqual(loaded["voice_trigger_mode"], "hold")
-        self.assertEqual(loaded["voice_hotkey"], "ralt")
+        self.assertEqual(loaded["voice_hotkey"], "lctrl+lwin")
 
     def test_load_repairs_recorded_left_alt_to_right_alt_in_hold_mode(self):
         with tempfile.TemporaryDirectory() as tmp:

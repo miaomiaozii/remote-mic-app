@@ -13,10 +13,18 @@ class DeviceCatalogTests(unittest.TestCase):
         self.assertIsNone(device_catalog.CATALOG_ERROR)
         self.assertEqual(
             [profile.device_id for profile in device_catalog.DEVICE_PROFILES],
-            [device_catalog.DJI_MIC_2_ID, device_catalog.RC003_ID],
+            [
+                device_catalog.RC001_ID,
+                device_catalog.DJI_MIC_2_ID,
+                device_catalog.RC003_ID,
+            ],
         )
+        rc001 = device_catalog.profile_for(device_catalog.RC001_ID)
         rc003 = device_catalog.profile_for(device_catalog.RC003_ID)
         dji = device_catalog.profile_for(device_catalog.DJI_MIC_2_ID)
+        self.assertEqual(rc001.display_name, "小米蓝牙遥控器 2（RC001）")
+        self.assertEqual(rc001.support_status, "implemented")
+        self.assertTrue(rc001.has_editable_button_mapping)
         self.assertEqual(rc003.display_name, "Xiaomi Bluetooth Remote 2 Pro / RC003")
         self.assertEqual(rc003.support_status, "research")
         self.assertEqual(dji.display_name, "DJI Mic 2")
@@ -29,6 +37,11 @@ class DeviceCatalogTests(unittest.TestCase):
     def test_old_or_unknown_config_defaults_to_rc003(self):
         self.assertEqual(device_catalog.normalize_device_id(None), device_catalog.RC003_ID)
         self.assertEqual(device_catalog.normalize_device_id("unknown"), device_catalog.RC003_ID)
+
+    def test_both_xiaomi_models_route_to_the_shared_remote_backend(self):
+        self.assertTrue(device_catalog.is_xiaomi_remote_device(device_catalog.RC001_ID))
+        self.assertTrue(device_catalog.is_xiaomi_remote_device(device_catalog.RC003_ID))
+        self.assertFalse(device_catalog.is_xiaomi_remote_device(device_catalog.DJI_MIC_2_ID))
 
     def test_dji_profile_has_no_editable_button_mapping(self):
         profile = device_catalog.profile_for(device_catalog.DJI_MIC_2_ID)
@@ -123,7 +136,11 @@ class DeviceCatalogTests(unittest.TestCase):
                 catalog = device_catalog.load_device_catalog()
                 self.assertEqual(
                     [profile.device_id for profile in catalog.profiles],
-                    [device_catalog.DJI_MIC_2_ID, device_catalog.RC003_ID],
+                    [
+                        device_catalog.RC001_ID,
+                        device_catalog.DJI_MIC_2_ID,
+                        device_catalog.RC003_ID,
+                    ],
                 )
 
     def test_frozen_locator_does_not_fall_back_to_source_when_bundle_data_is_missing(self):

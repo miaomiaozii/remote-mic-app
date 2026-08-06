@@ -218,16 +218,21 @@ class RC003HidReportTap:
                 server.listen(1)
                 server.settimeout(1.0)
                 if injection_attempted_pid is None:
+                    # A normal bridge process is deliberately not elevated, so
+                    # its best-effort injection may fail even though an
+                    # explicitly elevated helper has already loaded Gadget (or
+                    # is about to do so).  Keep accepting the loopback
+                    # connection in that case; otherwise the established
+                    # Gadget socket remains stuck in the listen backlog and no
+                    # HID reports are ever consumed.
+                    injection_attempted_pid = pid
                     try:
                         inject_current_process(pid)
-                        injection_attempted_pid = pid
                     except Exception as exc:
                         print(
-                            f"RC003 HID TAP injection retry {type(exc).__name__}: {exc}",
+                            f"RC003 HID TAP injection deferred {type(exc).__name__}: {exc}",
                             flush=True,
                         )
-                        self.stop_event.wait(self.retry_delay)
-                        continue
                 try:
                     client, _address = server.accept()
                 except socket.timeout:

@@ -74,7 +74,7 @@ Item {
 
             // -- Bridge control ------------------------------------------------
             Rectangle {
-                visible: SettingsController.isRc003Device
+                visible: SettingsController.isXiaomiRemoteDevice
                 Layout.fillWidth: true
                 radius: tokens.cornerRadiusLarge
                 color: tokens.surface
@@ -122,7 +122,7 @@ Item {
 
             // -- Voice output endpoint ------------------------------------------
             Rectangle {
-                visible: SettingsController.isRc003Device
+                visible: SettingsController.isXiaomiRemoteDevice
                 Layout.fillWidth: true
                 radius: tokens.cornerRadiusLarge
                 color: tokens.surface
@@ -162,7 +162,7 @@ Item {
 
             // -- Voice hotkey / trigger mode --------------------------------
             Rectangle {
-                visible: SettingsController.isRc003Device
+                visible: SettingsController.isXiaomiRemoteDevice
                 Layout.fillWidth: true
                 radius: tokens.cornerRadiusLarge
                 color: tokens.surface
@@ -216,7 +216,7 @@ Item {
                             Layout.columnSpan: 2
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            text: qsTr("免按住自动使用右 Alt+空格；长按自动使用右 Alt。切换触发方式会同步更新快捷键。")
+                            text: qsTr("豆包默认：免按住使用右 Alt+空格、长按使用右 Alt。微信输入法：长按请录入左 Ctrl+左 Win，免按住请录入左 Ctrl+左 Win+左 Shift；自定义组合键会被原样保留。")
                             color: tokens.textSecondary
                             font.pixelSize: tokens.fontSizeSmall
                         }
@@ -310,13 +310,13 @@ Item {
                 Layout.alignment: Qt.AlignRight
                 spacing: tokens.spacingSmall
                 Button {
-                    visible: SettingsController.isRc003Device
+                    visible: SettingsController.isXiaomiRemoteDevice
                     text: qsTr("恢复全部默认")
                     onClicked: SettingsController.restoreDefaults()
                 }
                 Button {
                     objectName: "deviceSaveButton"
-                    text: SettingsController.isRc003Device
+                    text: SettingsController.isXiaomiRemoteDevice
                         ? qsTr("保存并应用")
                         : qsTr("保存设备选择")
                     highlighted: true

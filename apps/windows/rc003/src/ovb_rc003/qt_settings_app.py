@@ -106,6 +106,9 @@ from . import (
     bridge_launcher,
     config,
     device_catalog,
+    direct_hid_capture,
+    frida_compat,
+    frida_hid_tap_elevation,
     hotkey,
     hotkey_capture_windows,
     key_mapping,
@@ -692,6 +695,7 @@ def _load_qt_classes() -> dict:
             )
             self._dji_mic_status_text = ""
             self._key_detection_listener = None
+            self._direct_hid_detection_listener = None
             self._key_detection_active = False
             self._key_detection_text = (
                 "尚未检测真实按键。点击“检测真实按键”后，再按一次遥控器按键。"
@@ -826,6 +830,23 @@ def _load_qt_classes() -> dict:
                 details += f" 解码错误={event.decode_error}"
             details += f" Signature={signature}"
             self._rawKeyDetected.emit(event.button_id or "", details)
+
+        def _on_direct_hid_detection(self, report_id: int, payload: bytes) -> None:
+            """Forward one bridge-owned HidOverGatt press to the Qt thread."""
+
+            if report_id != 1 or len(payload) != 6:
+                return
+            usages = frida_compat.payload_usages(payload)
+            for usage in sorted(usages):
+                button_id = frida_compat.TAP_USAGE_TO_BUTTON.get(usage)
+                if button_id is None:
+                    continue
+                details = (
+                    "HID-over-GATT 直连报告："
+                    f"{payload.hex(' ')} Usage=0x{usage:04X}"
+                )
+                self._rawKeyDetected.emit(button_id, details)
+                return
 
         def _on_raw_key_detected(self, button_id: str, details: str) -> None:
             """Handle one physical press on the Qt GUI thread.
@@ -1039,8 +1060,22 @@ def _load_qt_classes() -> dict:
             notify=selectedDeviceIndexChanged,
         )
 
+        def _get_is_xiaomi_remote_device(self) -> bool:
+            return device_catalog.is_xiaomi_remote_device(self._selected_device_id())
+
+        isXiaomiRemoteDevice = Property(
+            bool, _get_is_xiaomi_remote_device, notify=selectedDeviceChanged
+        )
+
         def _get_is_rc003_device(self) -> bool:
-            return self._selected_device_id() == device_catalog.RC003_ID
+            """Compatibility alias for older QML/tests.
+
+            Historically this property meant "uses the Xiaomi remote
+            backend", so preserve that behavior while the public QML surface
+            moves to ``isXiaomiRemoteDevice``.
+            """
+
+            return self._get_is_xiaomi_remote_device()
 
         isRc003Device = Property(bool, _get_is_rc003_device, notify=selectedDeviceChanged)
 
@@ -1059,7 +1094,7 @@ def _load_qt_classes() -> dict:
         )
 
         def _get_mapping_page_title(self) -> str:
-            return "按键映射" if self._get_is_rc003_device() else "设备控制"
+            return "按键映射" if self._get_is_xiaomi_remote_device() else "设备控制"
 
         mappingPageTitle = Property(str, _get_mapping_page_title, notify=selectedDeviceChanged)
 
@@ -1135,9 +1170,20 @@ def _load_qt_classes() -> dict:
 
             if self._key_detection_active:
                 return
-            if self._selected_device_id() != device_catalog.RC003_ID:
-                self._set_key_detection_text("当前设备不是 RC003，无法检测遥控器按键。")
+            if not device_catalog.is_xiaomi_remote_device(self._selected_device_id()):
+                self._set_key_detection_text("当前设备不是受支持的小米遥控器，无法检测按键。")
                 return
+            listener = None
+            direct_listener = None
+            errors = []
+            try:
+                direct_listener = direct_hid_capture.DirectHidCaptureListener(
+                    self._on_direct_hid_detection
+                )
+                direct_listener.start()
+            except Exception as exc:  # noqa: BLE001 - Raw Input may still work
+                direct_listener = None
+                errors.append(f"直连报告监听：{exc}")
             try:
                 paths = raw_input_windows.enumerate_matching_device_paths()
                 device_path = raw_input_windows.hid_identity.select_single_device_path(paths)
@@ -1152,17 +1198,26 @@ def _load_qt_classes() -> dict:
                     set_physical_bindings(self._bindings.get("physical_bindings", {}))
                 listener.start(device_path)
             except Exception as exc:  # noqa: BLE001 - surface failure in the UI
+                listener = None
+                errors.append(f"Raw Input：{exc}")
+
+            if listener is None and direct_listener is None:
                 self._key_detection_listener = None
+                self._direct_hid_detection_listener = None
                 self._key_detection_active = False
                 self.keyDetectionActiveChanged.emit()
-                self._set_key_detection_text(f"无法启动真实按键检测：{exc}")
+                self._set_key_detection_text(
+                    "无法启动真实按键检测：" + "；".join(errors)
+                )
                 return
 
             self._key_detection_listener = listener
+            self._direct_hid_detection_listener = direct_listener
             self._key_detection_active = True
             self.keyDetectionActiveChanged.emit()
             self._set_key_detection_text(
-                "正在监听 RC003。请现在按一次遥控器按键；不会执行该键的映射动作。"
+                "正在监听 RC001/RC003（含返回键直连报告）。请现在按一次遥控器按键；"
+                "检测器本身不会执行该键的映射动作。"
             )
 
         @Slot()
@@ -1199,14 +1254,38 @@ def _load_qt_classes() -> dict:
         def stopKeyDetection(self) -> None:
             listener = self._key_detection_listener
             self._key_detection_listener = None
+            direct_listener = self._direct_hid_detection_listener
+            self._direct_hid_detection_listener = None
             if listener is not None:
                 try:
                     listener.stop()
                 except Exception as exc:  # noqa: BLE001 - report, do not crash Qt
                     self._set_key_detection_text(f"停止真实按键检测时出错：{exc}")
+            if direct_listener is not None:
+                try:
+                    direct_listener.stop()
+                except Exception as exc:  # noqa: BLE001 - report, do not crash Qt
+                    self._set_key_detection_text(f"停止直连按键检测时出错：{exc}")
             if self._key_detection_active:
                 self._key_detection_active = False
                 self.keyDetectionActiveChanged.emit()
+
+        @Slot()
+        def enableFullHidSupport(self) -> None:
+            """Request the explicit, short-lived UAC HID helper."""
+
+            self._set_error_message("")
+            try:
+                pid = frida_hid_tap_elevation.request_hid_tap_activation()
+            except frida_hid_tap_elevation.HidTapActivationCancelled as exc:
+                self._set_status_message(str(exc))
+            except frida_hid_tap_elevation.HidTapActivationError as exc:
+                self._set_error_message(str(exc))
+            else:
+                self._set_status_message(
+                    "已启动完整 HID 支持助手并请求 UAC。授权完成后，返回键会由桥接程序接收；"
+                    f"目标服务进程 PID={pid}。"
+                )
 
         @Slot()
         def saveAndLaunch(self) -> None:

@@ -1,4 +1,4 @@
-"""Static identity facts for the Xiaomi Bluetooth Remote 2 Pro / RC003.
+"""Static identity facts shared by Xiaomi Bluetooth Remote 2 / 2 Pro.
 
 Derived from ``device-profiles/xiaomi-rc003.json`` and kept consistent with the
 Windows device profile so the client identifies the intended physical product.
@@ -11,9 +11,9 @@ token "dev_vid&012717_pid&32b8_rev&00a4" confirms VID 0x2717 / PID 0x32B8).
 
 from __future__ import annotations
 
-DISPLAY_NAME = "Xiaomi Bluetooth Remote 2 Pro / RC003"
+DISPLAY_NAME = "Xiaomi Bluetooth Remote 2 / 2 Pro (RC001 / RC003)"
 VENDOR = "Xiaomi"
-MODEL = "RC003"
+MODEL = "RC001 / RC003"
 
 # Bluetooth advertised/paired device names this client will match against.
 # Matching is exact (case/whitespace-insensitive) - never a fuzzy substring -
@@ -21,6 +21,7 @@ MODEL = "RC003"
 BLUETOOTH_NAMES = frozenset(
     {
         "mi rc",
+        "xiaomi bluetooth remote 2",
         "xiaomi bluetooth remote 2 pro",
         "小米蓝牙语音遥控器",
     }

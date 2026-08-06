@@ -14,6 +14,15 @@ class SelectSingleCandidateTests(unittest.TestCase):
         chosen = identity.select_single_candidate(candidates)
         self.assertEqual(chosen.name.strip().lower(), "xiaomi bluetooth remote 2 pro")
 
+    def test_selects_rc001_by_its_product_name(self):
+        candidates = [
+            identity.RC003Candidate(
+                name="  Xiaomi Bluetooth Remote 2  ", hardware_match=False
+            )
+        ]
+        chosen = identity.select_single_candidate(candidates)
+        self.assertEqual(chosen.name.strip(), "Xiaomi Bluetooth Remote 2")
+
     def test_hardware_match_counts_even_with_unrelated_name(self):
         candidates = [identity.RC003Candidate(name="Unknown Device", hardware_match=True)]
         chosen = identity.select_single_candidate(candidates)

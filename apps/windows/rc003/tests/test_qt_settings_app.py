@@ -407,6 +407,22 @@ class SettingsControllerTests(unittest.TestCase):
         self.assertFalse(controller.isDjiMic2Device)
         self.assertEqual(controller.mappingPageTitle, "按键映射")
 
+    def test_selecting_rc001_keeps_xiaomi_mapping_and_bridge_controls(self):
+        controller, _ = self._make_controller()
+        controller.selectedDeviceIndex = controller._DEVICE_ORDER.index(
+            device_catalog.RC001_ID
+        )
+        self.assertTrue(controller.isXiaomiRemoteDevice)
+        self.assertTrue(controller.isRc003Device)  # compatibility alias
+        self.assertFalse(controller.isDjiMic2Device)
+        self.assertEqual(controller.mappingPageTitle, "按键映射")
+        self.assertIn("RC001", controller.selectedDeviceDescription)
+        self.assertTrue(controller.saveSettings())
+        stored = config.load_config(
+            config.config_path(Path(self._tmpdir.name) / "RemoteMic" / "RC003")
+        )
+        self.assertEqual(stored["selected_device_profile"], device_catalog.RC001_ID)
+
     def test_selecting_dji_changes_the_ui_contract_and_persists(self):
         controller, _ = self._make_controller()
         controller.selectedDeviceIndex = controller._DEVICE_ORDER.index(
@@ -508,6 +524,16 @@ class SettingsControllerTests(unittest.TestCase):
             def stop(self):
                 self.stop_calls += 1
 
+        class FakeDirectListener:
+            def __init__(self, _callback):
+                self.stop_calls = 0
+
+            def start(self):
+                pass
+
+            def stop(self):
+                self.stop_calls += 1
+
         with mock.patch.object(
             qt_settings_app.raw_input_windows,
             "enumerate_matching_device_paths",
@@ -520,6 +546,10 @@ class SettingsControllerTests(unittest.TestCase):
             qt_settings_app.raw_input_windows,
             "RawInputButtonListener",
             FakeListener,
+        ), mock.patch.object(
+            qt_settings_app.direct_hid_capture,
+            "DirectHidCaptureListener",
+            FakeDirectListener,
         ):
             controller.startKeyDetection()
 
@@ -547,10 +577,59 @@ class SettingsControllerTests(unittest.TestCase):
             qt_settings_app.raw_input_windows,
             "enumerate_matching_device_paths",
             side_effect=RuntimeError("Raw Input unavailable"),
+        ), mock.patch.object(
+            qt_settings_app.direct_hid_capture,
+            "DirectHidCaptureListener",
+            side_effect=RuntimeError("direct HID unavailable"),
         ):
             controller.startKeyDetection()
         self.assertFalse(controller.keyDetectionActive)
         self.assertIn("Raw Input unavailable", controller.keyDetectionText)
+
+    def test_return_key_detection_accepts_bridge_owned_direct_hid_report(self):
+        controller, model = self._make_controller()
+        callbacks = []
+
+        class FakeDirectListener:
+            def __init__(self, callback):
+                callbacks.append(callback)
+
+            def start(self):
+                pass
+
+            def stop(self):
+                pass
+
+        with mock.patch.object(
+            qt_settings_app.direct_hid_capture,
+            "DirectHidCaptureListener",
+            FakeDirectListener,
+        ), mock.patch.object(
+            qt_settings_app.raw_input_windows,
+            "enumerate_matching_device_paths",
+            side_effect=RuntimeError("Raw Input unavailable"),
+        ):
+            controller.startKeyDetection()
+
+        self.assertTrue(controller.keyDetectionActive)
+        callbacks[0](1, bytes.fromhex("f10000000000"))
+        self.assertFalse(controller.keyDetectionActive)
+        self.assertEqual(controller.selectedButtonId, "back")
+        self.assertEqual(model.selected_button_id(), "back")
+        self.assertIn("返回键", controller.keyDetectionText)
+        self.assertIn("0x00F1", controller.keyDetectionText)
+
+    def test_full_hid_support_slot_surfaces_explicit_uac_request(self):
+        controller, _ = self._make_controller()
+        with mock.patch.object(
+            qt_settings_app.frida_hid_tap_elevation,
+            "request_hid_tap_activation",
+            return_value=42,
+        ):
+            controller.enableFullHidSupport()
+        self.assertEqual(controller.errorMessage, "")
+        self.assertIn("UAC", controller.statusMessage)
+        self.assertIn("42", controller.statusMessage)
 
     def test_open_log_location_reports_honestly_when_never_run(self):
         controller, _ = self._make_controller()

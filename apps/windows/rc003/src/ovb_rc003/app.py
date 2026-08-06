@@ -67,6 +67,7 @@ from . import (
     button_gesture,
     config,
     connection_supervisor,
+    direct_hid_capture,
     doubao_rpc,
     frida_compat,
     hid_identity,
@@ -77,6 +78,7 @@ from . import (
     logging_setup,
     raw_input_windows,
     voice_controller,
+    wechat_input_method,
     win32_input,
     win32_keys,
 )
@@ -251,13 +253,19 @@ class RC003App:
         self._legacy_key_suppressor = legacy_key_suppressor_windows.LegacyKeySuppressor(
             {0x74},
             on_key_event=self._on_legacy_key_event,
+            on_untranslated_key_event=self._on_legacy_untranslated_key_event,
             on_key_transform=self._transform_legacy_voice_key,
             on_key_emit=self._emit_legacy_voice_key,
-            rc003_vk_codes=frozenset(raw_input_windows.KEYBOARD_VK_TO_BUTTON),
+            rc003_vk_codes=frozenset(raw_input_windows.KEYBOARD_VK_TO_BUTTON) | {0xFF},
+            untranslated_key_signatures=frozenset({(0xFF, 0x6A, True)}),
+            consume_wait_seconds=0.100,
         )
         try:
             self._legacy_key_suppressor.start()
             self._logger.info("startup: RC003 voice legacy-key guard enabled")
+            self._logger.info(
+                "startup: RC001/RC003 untranslated back-key fallback enabled"
+            )
             if self._legacy_voice_transform_enabled():
                 self._logger.info(
                     "startup: RC003 F5 voice edge transforms to one physical right-Alt edge"
@@ -312,6 +320,7 @@ class RC003App:
 
         if report_id != 1 or len(payload) != 6:
             return
+        direct_hid_capture.publish_report(report_id, payload)
         active = {
             int.from_bytes(payload[index : index + 2], "little")
             for index in range(0, len(payload), 2)
@@ -488,7 +497,7 @@ class RC003App:
         """Whether the selected HOLD preset uses the physical right-Alt path."""
 
         return self._voice.trigger_mode == key_mapping.VoiceTriggerMode.HOLD and (
-            self._voice_hotkey.serialize() in {"ralt", "lctrl+win", "lctrl+lwin"}
+            self._voice_hotkey.serialize() == "ralt"
         )
 
     def _emit_legacy_voice_key(
@@ -605,6 +614,22 @@ class RC003App:
                 host_action_handled=host_action_handled,
             )
             self._voice_legacy_transform_emitted = False
+
+    def _on_legacy_untranslated_key_event(
+        self,
+        vk_code: int,
+        scan_code: int,
+        extended: bool,
+        is_pressed: bool,
+    ) -> None:
+        """Recover a remote edge that Windows omits from Raw Input."""
+
+        if (int(vk_code), int(scan_code), bool(extended)) != (0xFF, 0x6A, True):
+            return
+        self._logger.info(
+            "RC001/RC003 untranslated back edge: pressed=%s", bool(is_pressed)
+        )
+        self._on_button_event("back", bool(is_pressed))
 
     def _on_raw_input_event(self, event: raw_input_windows.RawInputEvent) -> None:
         """Arm the exact original keyboard edge for duplicate suppression.
@@ -976,6 +1001,25 @@ class RC003App:
 
     def _apply_voice_action(self, action: voice_controller.VoiceHostAction) -> bool:
         tokens = tuple(self._voice_hotkey.modifiers) + (self._voice_hotkey.key,)
+        if (
+            self._voice.trigger_mode == key_mapping.VoiceTriggerMode.HOLD
+            and set(tokens) == {"lctrl", "lwin"}
+            and action in {
+                voice_controller.VoiceHostAction.KEY_DOWN,
+                voice_controller.VoiceHostAction.KEY_UP,
+            }
+        ):
+            panel_active = action == voice_controller.VoiceHostAction.KEY_DOWN
+            if wechat_input_method.set_voice_panel_active(panel_active):
+                self._logger.info(
+                    "voice WeChat Input Method panel %s through status-bar button",
+                    "opened" if panel_active else "closed",
+                )
+                return True
+            self._logger.info(
+                "voice WeChat Input Method status-bar path unavailable; "
+                "falling back to configured hotkey"
+            )
         if self._voice_legacy_transform_session:
             if (
                 action == voice_controller.VoiceHostAction.KEY_UP

@@ -80,6 +80,7 @@ _BRANDING_CHECK_EXEMPT_RELATIVE_PATHS = {
     Path("build/check-public-boundary.ps1"),
     Path("installer/readme-rc003.txt"),
     Path("src/ovb_rc003/vb_cable_bundle.py"),
+    Path("src/ovb_rc003/frida_hid_tap_elevation.py"),
     # XRBM-031: README.md/ATTRIBUTION.md document the same disclosed
     # "runas"/UAC vendor-launch mechanism in prose (see README.md's
     # "VB-CABLE driver helper" section and ATTRIBUTION.md's
@@ -206,6 +207,14 @@ class BoundaryScanReplayTests(unittest.TestCase):
         path = _RC003_ROOT / "src" / "ovb_rc003" / "vb_cable_bundle.py"
         text = path.read_text(encoding="utf-8")
         self.assertTrue(any(marker in text for marker in _ELEVATION_MARKERS))
+        self.assertFalse(any(pattern.search(text) for pattern in _FORBIDDEN_BRANDING_PATTERNS))
+        self.assertFalse(any(marker in text for marker in _AUTOSTART_MARKERS))
+
+    def test_hid_tap_elevation_py_is_exempt_only_for_its_documented_reason(self):
+        path = _RC003_ROOT / "src" / "ovb_rc003" / "frida_hid_tap_elevation.py"
+        text = path.read_text(encoding="utf-8")
+        self.assertTrue(any(marker in text for marker in _ELEVATION_MARKERS))
+        self.assertIn("--rc003-hid-injector", text)
         self.assertFalse(any(pattern.search(text) for pattern in _FORBIDDEN_BRANDING_PATTERNS))
         self.assertFalse(any(marker in text for marker in _AUTOSTART_MARKERS))
 

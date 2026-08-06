@@ -281,7 +281,7 @@ class HostHotkeyFailureSuppressesMicOpenTests(_AppWiringTestCase):
 
     def test_physical_legacy_f5_transform_skips_a_second_host_shortcut(self):
         self.app._voice.trigger_mode = key_mapping.VoiceTriggerMode.HOLD
-        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("lctrl+lwin")
+        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("ralt")
         self.app._voice_legacy_transform_key_down = True
         hotkey_calls = []
         original = win32_input.send_voice_key_combo_down
@@ -297,7 +297,7 @@ class HostHotkeyFailureSuppressesMicOpenTests(_AppWiringTestCase):
 
     def test_hold_preset_maps_f5_to_one_right_alt_down_and_up_target(self):
         self.app._voice.trigger_mode = key_mapping.VoiceTriggerMode.HOLD
-        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("lctrl+lwin")
+        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("ralt")
 
         down = self.app._transform_legacy_voice_key(0x74, True)
         up = self.app._transform_legacy_voice_key(0x74, False)
@@ -344,7 +344,7 @@ class HostHotkeyFailureSuppressesMicOpenTests(_AppWiringTestCase):
 
     def test_physical_legacy_f5_transform_skips_closing_host_shortcut(self):
         self.app._voice.trigger_mode = key_mapping.VoiceTriggerMode.HOLD
-        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("lctrl+lwin")
+        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("ralt")
         self.app._voice_legacy_transform_session = True
         self.app._voice.on_mic_button_pressed()
         hotkey_calls = []
@@ -358,6 +358,71 @@ class HostHotkeyFailureSuppressesMicOpenTests(_AppWiringTestCase):
         self.assertEqual(hotkey_calls, [])
         self.assertFalse(self.app._voice.active)
         self.assertFalse(self.app._voice_legacy_transform_session)
+
+    def test_wechat_input_method_ctrl_win_hold_is_not_rewritten_to_right_alt(self):
+        self.app._voice.trigger_mode = key_mapping.VoiceTriggerMode.HOLD
+        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("lctrl+lwin")
+        self.assertFalse(self.app._legacy_voice_transform_enabled())
+        self.assertIsNone(self.app._transform_legacy_voice_key(0x74, True))
+
+        calls = []
+        original = win32_input.send_voice_key_combo_down
+        original_panel = app_module.wechat_input_method.set_voice_panel_active
+        win32_input.send_voice_key_combo_down = lambda tokens: calls.append(tokens)
+        app_module.wechat_input_method.set_voice_panel_active = lambda active: False
+        try:
+            self.app._on_legacy_key_event(0x74, True)
+        finally:
+            win32_input.send_voice_key_combo_down = original
+            app_module.wechat_input_method.set_voice_panel_active = original_panel
+
+        self.assertEqual(calls, [("lctrl", "lwin")])
+        self.assertTrue(self.app._voice.active)
+        self.assertFalse(self.app._voice_legacy_transform_session)
+
+    def test_wechat_input_method_hold_uses_status_bar_instead_of_keyboard(self):
+        self.app._voice.trigger_mode = key_mapping.VoiceTriggerMode.HOLD
+        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("lctrl+lwin")
+        panel_calls = []
+        keyboard_calls = []
+        original_panel = app_module.wechat_input_method.set_voice_panel_active
+        original_keyboard = win32_input.send_voice_key_combo_down
+        app_module.wechat_input_method.set_voice_panel_active = (
+            lambda active: panel_calls.append(active) or True
+        )
+        win32_input.send_voice_key_combo_down = lambda tokens: keyboard_calls.append(tokens)
+        try:
+            self.assertTrue(
+                self.app._apply_voice_action(
+                    app_module.voice_controller.VoiceHostAction.KEY_DOWN
+                )
+            )
+        finally:
+            app_module.wechat_input_method.set_voice_panel_active = original_panel
+            win32_input.send_voice_key_combo_down = original_keyboard
+
+        self.assertEqual(panel_calls, [True])
+        self.assertEqual(keyboard_calls, [])
+
+    def test_wechat_input_method_status_bar_failure_keeps_hotkey_fallback(self):
+        self.app._voice.trigger_mode = key_mapping.VoiceTriggerMode.HOLD
+        self.app._voice_hotkey = app_module.hotkey.HotkeySpec.parse("lctrl+lwin")
+        keyboard_calls = []
+        original_panel = app_module.wechat_input_method.set_voice_panel_active
+        original_keyboard = win32_input.send_voice_key_combo_down
+        app_module.wechat_input_method.set_voice_panel_active = lambda active: False
+        win32_input.send_voice_key_combo_down = lambda tokens: keyboard_calls.append(tokens)
+        try:
+            self.assertTrue(
+                self.app._apply_voice_action(
+                    app_module.voice_controller.VoiceHostAction.KEY_DOWN
+                )
+            )
+        finally:
+            app_module.wechat_input_method.set_voice_panel_active = original_panel
+            win32_input.send_voice_key_combo_down = original_keyboard
+
+        self.assertEqual(keyboard_calls, [("lctrl", "lwin")])
 
     def test_hid_mic_button_is_ignored_until_ble_session_is_connected(self):
         self.app._ble_session = None
@@ -480,6 +545,18 @@ class CorruptButtonBindingFailsClosedTests(_AppWiringTestCase):
 
 
 class OrdinaryButtonGestureWiringTests(_AppWiringTestCase):
+    def test_untranslated_back_edge_runs_the_saved_back_action(self):
+        calls = []
+        original = win32_input.send_delete_backward
+        win32_input.send_delete_backward = lambda: calls.append("backspace")
+        try:
+            self.app._on_legacy_untranslated_key_event(0xFF, 0x6A, True, True)
+            self.app._on_legacy_untranslated_key_event(0xFF, 0x6A, True, False)
+        finally:
+            win32_input.send_delete_backward = original
+
+        self.assertEqual(calls, ["backspace"])
+
     def test_saved_mapping_is_reloaded_before_the_next_button_event(self):
         updated = config.default_key_bindings()
         updated["bindings"]["back"] = {"kind": "key_combo", "keys": ["f8"]}

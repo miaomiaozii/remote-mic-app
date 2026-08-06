@@ -493,6 +493,7 @@ class WindowsCiWorkflowTests(unittest.TestCase):
             "COPYRIGHT.md",
             "LICENSE.md",
             "THIRD_PARTY_NOTICES.md",
+            "device-profiles/xiaomi-rc001.json",
             "device-profiles/xiaomi-rc003.json",
         ):
             trigger_line = f'      - "{path_trigger}"'

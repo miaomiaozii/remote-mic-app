@@ -83,6 +83,30 @@ class LegacyKeySuppressorDecisionTests(unittest.TestCase):
         self.assertFalse(gate.handle_key_event(0x74, suppressor.LLKHF_INJECTED, True))
         self.assertEqual(events, [(0x74, True), (0x74, False)])
 
+    def test_untranslated_back_signature_is_owned_without_admin_hid_tap(self):
+        events = []
+        gate = suppressor.LegacyKeySuppressor(
+            {0x74},
+            on_untranslated_key_event=lambda vk, scan, extended, pressed: events.append(
+                (vk, scan, extended, pressed)
+            ),
+            untranslated_key_signatures=frozenset({(0xFF, 0x6A, True)}),
+        )
+
+        flags = suppressor.LLKHF_EXTENDED
+        self.assertTrue(gate.handle_untranslated_key_event(0xFF, 0x6A, flags, True))
+        self.assertTrue(gate.handle_untranslated_key_event(0xFF, 0x6A, flags, False))
+        self.assertFalse(gate.handle_untranslated_key_event(0xFF, 0x6B, flags, True))
+        self.assertFalse(
+            gate.handle_untranslated_key_event(
+                0xFF, 0x6A, flags | suppressor.LLKHF_INJECTED, True
+            )
+        )
+        self.assertEqual(
+            events,
+            [(0xFF, 0x6A, True, True), (0xFF, 0x6A, True, False)],
+        )
+
     def test_armed_raw_input_edge_is_consumed_once_and_only_with_exact_identity(self):
         gate = suppressor.LegacyKeySuppressor({0x74})
         gate.arm_key_event(0x26, 0x48, True, True)

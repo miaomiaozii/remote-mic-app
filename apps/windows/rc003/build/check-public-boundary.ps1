@@ -122,6 +122,11 @@ $brandingCheckExemptRelativePaths = @(
     # that the elevation reference is exactly the one disclosed vendor-launch
     # call, not a self-elevation of this project's own process.
     "src/ovb_rc003/vb_cable_bundle.py",
+    # Explicit user-click path for the short-lived, hash-pinned RC001/RC003
+    # HID injector helper. Normal settings and bridge processes remain
+    # unelevated; tests/test_privacy_contract.py scopes this exemption to the
+    # --rc003-hid-injector mode.
+    "src/ovb_rc003/frida_hid_tap_elevation.py",
     # README.md/ATTRIBUTION.md document this same disclosed "runas"/UAC
     # vendor-launch mechanism in prose - the word itself is documentation,
     # not a directive.

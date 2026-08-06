@@ -66,6 +66,19 @@ class _ArgvRestoringTestCase(unittest.TestCase):
 
 
 class BridgeModeRoutingTests(_ArgvRestoringTestCase):
+    def test_rc001_profile_starts_the_shared_xiaomi_bridge(self):
+        app_main_calls = []
+        app.main = lambda: app_main_calls.append(1)
+        config.load_config = lambda path: {
+            "selected_device_profile": device_catalog.RC001_ID
+        }
+        single_instance.BridgeInstanceGuard = _make_guard_class()
+        sys.argv = ["ovb_rc003", "--bridge"]
+
+        main_module.main()
+
+        self.assertEqual(app_main_calls, [1])
+
     def test_dji_profile_never_starts_the_rc003_bridge(self):
         app.main = lambda: self.fail("DJI Mic 2 must not start the RC003 bridge")
         config.load_config = lambda path: {

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "id": "xiaomi-rc001",
+  "displayName": "小米蓝牙遥控器 2（RC001）",
+  "vendor": "Xiaomi",
+  "model": "RC001",
+  "support": {
+    "status": "implemented",
+    "notes": "RC001 与 RC003 在 Windows 上使用相同的 VID/PID、蓝牙名称、AB5E ATVV 语音服务和 HID 按键协议；已在 RC001（硬件 V2.0、固件 2671）上完成能力协商、语音流启动和 PCM 解码真机验证。"
+  },
+  "identity": {
+    "bluetoothNames": [
+      "MI RC",
+      "Xiaomi Bluetooth Remote 2",
+      "小米蓝牙语音遥控器"
+    ],
+    "hid": {
+      "vendorId": 10007,
+      "productId": 12984
+    }
+  },
+  "transports": [
+    {
+      "kind": "ble-gatt",
+      "role": "voice-input",
+      "status": "implemented",
+      "notes": "使用与 RC003 相同的 AB5E Android TV Voice-over-BLE 服务；RC001 真机返回 ATVV v1.0、16 kHz、120-byte frame，并已成功解码 PCM。"
+    },
+    {
+      "kind": "bluetooth-hid",
+      "role": "button-input",
+      "status": "implemented",
+      "notes": "Windows 实机枚举为 VID 0x2717 / PID 0x32B8；语音键实测上报 F5，与 RC003 共用按键读取和映射实现。"
+    }
+  ],
+  "capabilities": [
+    "voice-capture",
+    "press-to-talk",
+    "button-input",
+    "host-key-mapping"
+  ],
+  "protocols": [
+    {
+      "id": "android-tv-voice-over-ble",
+      "status": "implemented",
+      "notes": "RC001 实机已通过 RC003 的同协议实现完成 AB5E 连接、能力协商、MIC_OPEN、音频通知和 IMA/DVI ADPCM 解码。"
+    }
+  ],
+  "platforms": [
+    {
+      "platform": "windows",
+      "status": "implemented",
+      "notes": "已加入设备选择、BLE/HID 身份识别、按键映射和语音桥接路由，并在一只 RC001 真机上完成端到端语音链路验证；更多固件版本和长时间稳定性仍建议继续复核。"
+    }
+  ],
+  "sources": [
+    "https://www.mi.com/shop/buy/detail?product_id=23719",
+    "https://github.com/miaomiaozii/windows-remote-mic-app"
+  ]
+}

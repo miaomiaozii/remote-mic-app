@@ -36,7 +36,7 @@ name: windows-rc003-ci
 # XRBM-022 controller pre-review correction: the installer (.iss) and the
 # PyInstaller spec both consume these repository-root files directly
 # (COPYRIGHT/LICENSE/THIRD_PARTY_NOTICES.md are packaged into the installed
-# app; device-profiles/xiaomi-rc003.json documents the identity/HID facts
+# app; the Xiaomi device profiles document the shared RC001/RC003 identity/HID facts
 # the Windows adapter's own device_profile.py mirrors), so a change to any
 # of them must re-run this workflow even though none of them live under
 # apps/windows/rc003/.
@@ -49,6 +49,7 @@ on:
       - "LICENSE.md"
       - "THIRD_PARTY_NOTICES.md"
       - "device-profiles/xiaomi-rc003.json"
+      - "device-profiles/xiaomi-rc001.json"
       - "device-profiles/dji-mic-2.json"
   pull_request:
     paths:
@@ -58,6 +59,7 @@ on:
       - "LICENSE.md"
       - "THIRD_PARTY_NOTICES.md"
       - "device-profiles/xiaomi-rc003.json"
+      - "device-profiles/xiaomi-rc001.json"
       - "device-profiles/dji-mic-2.json"
 
 permissions:

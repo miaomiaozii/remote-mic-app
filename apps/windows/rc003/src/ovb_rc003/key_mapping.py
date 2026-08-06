@@ -92,7 +92,7 @@ VOICE_HOTKEY_PRESETS = {
 # built-ins rather than user customizations, so config migration may replace
 # either spelling with the current physical shortcut.
 LEGACY_VOICE_HOTKEYS = frozenset(
-    {"ralt", "ralt+space", "lctrl+win", "lctrl+lwin"}
+    {"ralt", "ralt+space"}
 )
 
 
@@ -156,9 +156,10 @@ def voice_trigger_mode_for_hotkey(hotkey_text: str) -> Optional[VoiceTriggerMode
     """Infer the built-in voice trigger semantics from a recorded chord.
 
     The two current Doubao voice modes are not interchangeable: ``ralt+space``
-    is a toggle, while ``ralt`` is held for the duration of speech. The old
-    Ctrl+Win chord is still recognized so legacy settings and recordings can
-    be migrated, but it is not the current HOLD preset. A physical recorder
+    is a toggle, while ``ralt`` is held for the duration of speech. Ctrl+Win
+    is recognized as HOLD because it is WeChat Input Method's hold-to-talk
+    shortcut; unlike the Doubao presets it remains a custom chord and is never
+    rewritten to right Alt. A physical recorder
     can return either generic or directional Win, and users may press the
     keys in either order, so compare the normalized token set. Return ``None``
     for a genuinely custom shortcut and leave its selected mode under user

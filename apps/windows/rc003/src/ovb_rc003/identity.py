@@ -34,7 +34,7 @@ class AmbiguousCandidateError(RC003IdentityError):
 
     def __init__(self, count: int):
         super().__init__(
-            f"{count} RC003 candidates found; keep only one paired device and retry"
+            f"{count} RC001/RC003 candidates found; keep only one paired device and retry"
         )
         self.count = count
 
@@ -78,7 +78,7 @@ def select_single_candidate(candidates: Sequence[RC003Candidate]) -> RC003Candid
     ]
 
     if not qualifying:
-        raise NoCandidateFoundError("no paired RC003 candidate was discovered")
+        raise NoCandidateFoundError("no paired RC001/RC003 candidate was discovered")
     if len(qualifying) > 1:
         raise AmbiguousCandidateError(len(qualifying))
     return qualifying[0]

@@ -72,6 +72,37 @@ Item {
                         }
                     }
 
+                    // -- RC001/RC003 full HID path -------------------------
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: tokens.spacingMedium
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Label {
+                                text: qsTr("返回键完整 HID 支持")
+                                color: tokens.textPrimary
+                                font.pixelSize: tokens.fontSizeBody
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                text: qsTr("RC001/RC003 的返回键报告由 Windows HID 系统服务持有。"
+                                    + "点击后会请求一次 UAC，仅把已校验的本地报告探针加载到该服务；"
+                                    + "普通按键、语音数据和映射配置不会以管理员权限运行。"
+                                    + "Windows 或蓝牙 HID 服务重启后需要重新启用。")
+                                color: tokens.textSecondary
+                                font.pixelSize: tokens.fontSizeSmall
+                            }
+                        }
+                        Button {
+                            id: enableFullHidButton
+                            objectName: "enableFullHidButton"
+                            text: qsTr("启用返回键（UAC）")
+                            onClicked: SettingsController.enableFullHidSupport()
+                        }
+                    }
+
                     // -- Microphone / speech recognition ----------------------
                     RowLayout {
                         Layout.fillWidth: true

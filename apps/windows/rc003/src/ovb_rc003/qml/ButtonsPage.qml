@@ -101,7 +101,7 @@ Item {
     RowLayout {
         id: rc003MappingLayout
         objectName: "rc003MappingLayout"
-        visible: SettingsController.isRc003Device
+        visible: SettingsController.isXiaomiRemoteDevice
         anchors.fill: parent
         anchors.margins: tokens.spacingMedium
         spacing: tokens.spacingMedium

@@ -1,7 +1,12 @@
 import hashlib
+import json
+import socket
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from ovb_rc003 import frida_compat
 
@@ -125,6 +130,58 @@ class ReportTapTests(unittest.TestCase):
             layer = frida_compat.BackKeyCompatLayer(gadget_path=path, asset=asset)
             self.assertTrue(layer.available)
             self.assertEqual(layer.status, "ready_gadget_verified")
+
+    def test_server_accepts_elevated_gadget_after_local_injection_is_denied(self):
+        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+
+        reports = []
+        received = threading.Event()
+        tap = frida_compat.RC003HidReportTap(
+            lambda report_id, payload: (reports.append((report_id, payload)), received.set()),
+            enabled=False,
+            retry_delay=0.5,
+        )
+        thread = threading.Thread(target=tap._run, daemon=True)
+        with mock.patch.object(
+            frida_compat.frida_hid_tap_runtime,
+            "HID_TAP_PORT",
+            port,
+        ), mock.patch.object(
+            frida_compat.frida_hid_tap_runtime,
+            "find_rc003_hidogatt_host_pid",
+            return_value=42,
+        ), mock.patch.object(
+            frida_compat,
+            "inject_current_process",
+            side_effect=PermissionError("elevation required"),
+        ):
+            thread.start()
+            deadline = time.monotonic() + 2.0
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            while True:
+                try:
+                    client.connect(("127.0.0.1", port))
+                    break
+                except ConnectionRefusedError:
+                    if time.monotonic() >= deadline:
+                        self.fail("tap server did not start")
+                    time.sleep(0.01)
+            try:
+                for message in (
+                    {"kind": "ready", "pid": 42},
+                    {"kind": "gatt_read", "raw": "010000f10000000000"},
+                ):
+                    client.sendall((json.dumps(message) + "\n").encode("utf-8"))
+                self.assertTrue(received.wait(2.0))
+            finally:
+                tap.stop_event.set()
+                client.close()
+                thread.join(timeout=2.0)
+        self.assertFalse(thread.is_alive())
+        self.assertIn((1, bytes.fromhex("f10000000000")), reports)
 
 
 if __name__ == "__main__":

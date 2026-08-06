@@ -264,13 +264,18 @@ def inject_current_process(pid: int) -> None:
         raise RuntimeError(
             f"RC003 host changed before injection: expected={expected_pid} requested={pid}"
         )
+    # WUDFHost's process DACL denies even PROCESS_QUERY_LIMITED_INFORMATION
+    # to a normal administrator token. Enable the already-assigned debug
+    # privilege before validating the image name; the PID is still obtained
+    # from the exact RC001/RC003 HidOverGatt device instance above, and the
+    # name check still refuses every non-WUDFHost target.
+    enable_debug_privilege()
     if _target_process_name(pid) != "wudfhost.exe":
         raise RuntimeError("refusing non-WUDFHost target")
     dll_path = prepare_secure_runtime()
     dll_hash = sha256_file(dll_path)
     if dll_hash != GADGET_DLL_SHA256:
         raise RuntimeError(f"verified Gadget changed before injection: {dll_hash}")
-    enable_debug_privilege()
     inject_library(pid, dll_path)
 
 

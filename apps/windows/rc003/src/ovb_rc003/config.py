@@ -154,16 +154,6 @@ def _normalize_voice_hotkey(config: Dict[str, Any]) -> None:
     current = str(config.get("voice_hotkey", "")).strip().lower()
     from . import key_mapping
 
-    # The former HOLD preset was Ctrl+Win. It is a shipped built-in, not a
-    # user customization: migrate it to the right-Alt physical bridge and
-    # repair the mode even if the two old fields were saved out of sync.
-    if current in {"lctrl+win", "lctrl+lwin"}:
-        config["voice_trigger_mode"] = key_mapping.VoiceTriggerMode.HOLD.value
-        config["voice_hotkey"] = key_mapping.voice_hotkey_for_trigger_mode(
-            key_mapping.VoiceTriggerMode.HOLD
-        )
-        return
-
     try:
         mode = key_mapping.VoiceTriggerMode(config.get("voice_trigger_mode"))
     except ValueError:
@@ -175,6 +165,10 @@ def _normalize_voice_hotkey(config: Dict[str, Any]) -> None:
         config["voice_hotkey"] = key_mapping.voice_hotkey_for_trigger_mode(mode)
         return
 
+    # Ctrl+Win is WeChat Input Method's hold-to-talk shortcut. It used to be
+    # this project's own legacy HOLD preset, but it is now a legitimate
+    # user-selected application shortcut and must never be rewritten to the
+    # Doubao-specific right-Alt preset.
     if current not in key_mapping.LEGACY_VOICE_HOTKEYS:
         inferred_mode = key_mapping.voice_trigger_mode_for_hotkey(current)
         if inferred_mode is not None:

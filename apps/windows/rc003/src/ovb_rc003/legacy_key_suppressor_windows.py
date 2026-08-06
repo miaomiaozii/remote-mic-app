@@ -108,16 +108,27 @@ class LegacyKeySuppressor:
         self,
         suppress_vk_codes,
         on_key_event: Optional[Callable[[int, bool], None]] = None,
+        on_untranslated_key_event: Optional[
+            Callable[[int, int, bool, bool], None]
+        ] = None,
         on_key_transform: Optional[
             Callable[[int, bool], Optional[PhysicalKeyTarget]]
         ] = None,
         on_key_emit: Optional[Callable[[PhysicalKeyTarget, bool], bool]] = None,
         *,
         rc003_vk_codes: Optional[FrozenSet[int]] = None,
+        untranslated_key_signatures: Optional[
+            FrozenSet[tuple[int, int, bool]]
+        ] = None,
         consume_wait_seconds: float = 0.060,
     ) -> None:
         self._suppress_vk_codes: FrozenSet[int] = frozenset(int(vk) for vk in suppress_vk_codes)
         self._on_key_event = on_key_event
+        self._on_untranslated_key_event = on_untranslated_key_event
+        self._untranslated_key_signatures = frozenset(
+            (int(vk), int(scan), bool(extended))
+            for vk, scan, extended in (untranslated_key_signatures or frozenset())
+        )
         self._on_key_transform = on_key_transform
         # Production callers can replace a swallowed physical edge with a
         # real Win32 input edge. Returning False keeps the original event
@@ -194,6 +205,39 @@ class LegacyKeySuppressor:
             except Exception:
                 # The hook must remain fail-closed even if the application
                 # callback is temporarily unavailable.
+                pass
+        return True
+
+    def handle_untranslated_key_event(
+        self,
+        vk_code: int,
+        scan_code: int,
+        flags: int,
+        is_pressed: bool,
+    ) -> bool:
+        """Own one explicitly configured untranslated physical key edge.
+
+        Windows exposes the RC001/RC003 back usage (0x00F1) to the low-level
+        hook as ``VK=0xFF, scan=0x6A`` even when it omits the corresponding
+        Raw Input record.  The signature allow-list keeps this fallback
+        narrower than a global browser-back hook and injected input is never
+        accepted.
+        """
+
+        if int(flags) & LLKHF_INJECTED:
+            return False
+        extended = bool(int(flags) & LLKHF_EXTENDED)
+        signature = (int(vk_code), int(scan_code), extended)
+        if signature not in self._untranslated_key_signatures:
+            return False
+        if self._on_untranslated_key_event is not None:
+            try:
+                self._on_untranslated_key_event(
+                    int(vk_code), int(scan_code), extended, bool(is_pressed)
+                )
+            except Exception:
+                # The unusable VK=0xFF edge must not leak into the foreground
+                # when the application callback is temporarily unavailable.
                 pass
         return True
 
@@ -559,6 +603,13 @@ class LegacyKeySuppressor:
                     bool(int(event.flags) & LLKHF_EXTENDED),
                     is_pressed,
                 )
+            ):
+                return 1
+            if self.handle_untranslated_key_event(
+                event.vkCode,
+                event.scanCode,
+                event.flags,
+                is_pressed,
             ):
                 return 1
             if self.handle_key_event(event.vkCode, event.flags, is_pressed):

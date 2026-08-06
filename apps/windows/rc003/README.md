@@ -9,16 +9,34 @@
 > 当前产物未签名，也不会自动安装虚拟音频驱动。Frida Gadget 与 VB-CABLE 均为
 > 可选第三方组件，需要显式获取/安装（见下文）。
 
-这是本仓库独立维护的 Windows RC003 客户端，面向小米蓝牙遥控器 2 Pro / RC003，
+这是本仓库独立维护的 Windows 小米遥控器客户端，面向小米蓝牙遥控器 2
+/ RC001 和小米蓝牙遥控器 2 Pro / RC003，
 提供按键映射和 ATVV
 （Android TV Voice-over-BLE）语音桥接。项目整体说明请阅读仓库根目录的
 `README.md`。
 
-设置窗口提供明确的设备选择器。选择 **小米 RC003** 时使用桥接、虚拟输出和
+设置窗口提供明确的设备选择器。选择 **小米 RC001** 或 **小米 RC003** 时
+使用同一桥接、虚拟输出和
 13 键映射界面；选择 **DJI Mic 2（Pocket 3 套装发射器）** 时切换到独立的
 Windows 系统录音输入页面，绝不会启动 RC003 BLE/HID/ATVV 桥接。DJI 发射器
 的录音、连接和电源键目前只作为只读硬件说明，尚未声称它们是可映射的 Windows
 按键。
+
+### RC001 为什么可以复用 RC003 后端
+
+已配对 RC001 的 Windows 实机枚举结果为 VID `0x2717`、PID `0x32B8`、
+版本 `0x00A4`，设备名为“小米蓝牙语音遥控器”，并包含
+`AB5E0001-5A21-4F05-BC7D-AF01F617B664` 语音服务。这些值与 RC003
+客户端既有的硬件匹配、ATVV UUID 和 HID 旁路目标完全相同。适配因此采用
+独立 RC001 产品档案加共享后端，而不是复制一份容易漂移的协议实现。
+
+本次真机读取到的 Device Information 为 Model `RC001`、Hardware `V2.0`、
+Firmware `2671`。修改版随后独立完成 ATVV v1.0 能力协商（16 kHz、120-byte
+frame）、`MIC_OPEN`、音频通知和 PCM 解码，确认共享后端覆盖了完整语音路径，
+而不只是按键和设备名称匹配。
+
+RC001 和 RC003 如果同时配对，程序仍会按原有安全策略拒绝猜测连接哪一只；
+请只保留当前要使用的一只处于配对/连接状态。
 
 ## 中文安装与使用说明
 
@@ -157,8 +175,8 @@ VB-CABLE 虚拟音频驱动"卡片会显示 CABLE Input/CABLE Output 两个端�
 购买授权，仅随包提供基础版、不含付费的 A+B/C+D，安装会改变系统状态并需要
 重启），确认后才会解压随安装包携带的官方 `VBCABLE_Driver_Pack45.zip`（构建
 时已用固定的 SHA-256 校验过，未被本项目修改），并以 Windows 用户账户控制
-(UAC) 提示启动官方原始的 `VBCABLE_Setup_x64.exe`——本程序自身全程不以管理员
-身份运行，UAC 提示可以随时取消，取消不会安装任何内容。安装完成后需要重启
+(UAC) 提示启动官方原始的 `VBCABLE_Setup_x64.exe`——常驻设置/桥接进程不会因此
+获得管理员权限，UAC 提示可以随时取消，取消不会安装任何内容。安装完成后需要重启
 电脑，重启后点击"重新检测"确认两个端点已出现，再点击同一页的"选择检测到
 的 CABLE Input 作为输出"即可把它设为语音输出端点（仍需要按方向手动把
 听写/识别软件的麦克风输入设为 `CABLE Output`）。这个入口只是把上面的手动
@@ -207,6 +225,12 @@ VB-CABLE 虚拟音频驱动"卡片会显示 CABLE Input/CABLE Output 两个端�
    光标保持在同一个可编辑文本框中，按住遥控器麦克风键说话，检查是否有文字被输入；
    如果手动组合键都无法启动豆包，请先解决豆包快捷键或输入设备配置问题，本程序
    不能让本来就不工作的豆包输入法变得可用；
+
+   如果目标是 **微信输入法的语音输入**，请选择“长按”触发方式，
+   再把组合键录入为 `lctrl+lwin`（左 Ctrl + 左 Win）。微信输入法的免按住方式可改用
+   `lctrl+lwin+lshift`。这些组合键属于用户自定义值，程序会原样保存，不会再迁移为
+   豆包的右 Alt。微信输入法仍需把麦克风输入设为 `CABLE Output`；Remote Mic 的语音输出则
+   必须选择 `CABLE Input`，两端方向不能反；
 5. 需要时从 Start Menu 选择"停止 Remote Mic · RC003"结束桥接，
    或从"设置 → 应用"/Start Menu 的"卸载"条目卸载（卸载会先自动停止
    正在运行的进程，再删除安装时写入的程序文件）。遇到按键/语音/启动
@@ -270,8 +294,9 @@ RC003 共 **13 个物理按键**（12 个普通按键 + 1 个固定的麦克风�
 参考项目的 Windows 实现，并在本仓库中完成了品牌、构建和说明适配。已在真实
 RC003 上完成配对、逐键（方向/OK/Home/Menu/TV/Power/返回/音量±单次触发）和
 语音链路（豆包输入法识别遥控器语音）验收；ATVV 语音延迟与音量、长期重连
-稳定性仍建议在更多真实场景中继续观察。只有用户明确确认后，程序才会通过
-Windows 的 `runas`/UAC 启动 VB-Audio 官方安装器；Remote Mic 自身不会提权。
+稳定性仍建议在更多真实场景中继续观察。只有用户明确点击后，程序才会通过
+Windows 的 `runas`/UAC 启动 VB-Audio 官方安装器或短时 HID 支持助手；常驻设置、
+桥接和语音进程不会以管理员权限运行。
 
 ## 功能实现
 
@@ -279,7 +304,7 @@ Windows 客户端围绕 RC003 使用场景实现，主要功能如下：
 
 - 使用 **WinRT BLE** 查找已配对的 RC003，并按设备名称精确匹配；找到 0 个或多个候选时都会拒绝猜测。服务与特征读取使用 `BluetoothCacheMode.UNCACHED`，避免 Windows 返回过期枚举。
 - 使用 Windows **Raw Input** 接收遥控器普通按键，并校验选中的 HID 路径，避免误接收另一只相同型号设备的事件。
-- 对 Windows Raw Input 丢失的 HID usages，可选复用上游的 Frida Gadget WUDFHost tap。该 tap 上报遥控器的**全部键盘 usage**（返回 `0xF1`、音量 `0x80/0x81`、方向/OK/Home/Menu/TV/Power 等），作为所有普通按键的输入旁路：它在独立 socket 线程上 arm，低层键盘钩子零等待匹配并吞掉原生键，只注入一次映射动作，解决一次按键两次触发的问题。只有显式下载并校验 Gadget 后才会启用；Remote Mic 不会自动提权，需要 tap 时用户必须从已明确提升权限的终端启动桥接。
+- 对 Windows Raw Input 丢失的 HID usages，可选复用上游的 Frida Gadget WUDFHost tap。该 tap 上报遥控器的**全部键盘 usage**（返回 `0xF1`、音量 `0x80/0x81`、方向/OK/Home/Menu/TV/Power 等），作为所有普通按键的输入旁路：它在独立 socket 线程上 arm，低层键盘钩子零等待匹配并吞掉原生键，只注入一次映射动作，解决一次按键两次触发的问题。只有已校验 Gadget 存在时才会启用；用户在“权限”页点击“启用返回键（UAC）”后，只启动一次短时注入助手，常驻桥接仍保持普通权限。
 - 连接 ATVV GATT 服务，协商能力，接收并解码 16 kHz IMA/DVI ADPCM 语音帧。
 - 使用 **PortAudio** 把解码后的语音写入用户明确选择的输出端点（按端点能力输出立体声并复制声道；16 kHz → 48 kHz 有状态连续插值；解码后经 20 Hz 高通 DC 阻挡和 +10 dB 增益）；不会自动使用 Windows 默认设备。
 - 语音快捷键使用带私有标记的虚拟键 `keybd_event`；`DoubaoPhysicalizer` 附加到豆包 `ImeService.exe` 的低层回调，只对该标记事件清除 `LLKHF_INJECTED` / lower-integrity 标志并清空 `dwExtraInfo`，再把右 Alt 事件转交给后续钩子，因此豆包看到的形状与实体右 Alt 一致。默认切换模式为 `ralt+space`，按住模式为 `ralt`；不把 Windows `Win+H` 当作豆包输入法的验收目标。
@@ -287,7 +312,7 @@ Windows 客户端围绕 RC003 使用场景实现，主要功能如下：
 - 提供“连接”“按键”“权限”“检查与修复”四个设置页面；诊断页会区分“已检测到”和“需要手动验证”，不会把进程存活伪装成硬件验收通过。
 - 设置窗口使用 PySide6 Essentials + Qt Quick/QML；便携版和安装器都通过 PyInstaller 打包，不要求终端用户另装 Python 或 Qt。**单个 `RemoteMicRC003.exe`**：双击（无参数）或 `--settings` 打开设置窗口，`--bridge` 启动桥接。
 - 配置写入采用临时文件 + fsync + `os.replace` 原子替换，失败不会留下半写的 JSON；桥接进程在按键前按 mtime 热加载新保存的按键映射，磁盘数据损坏时保留最后一份有效映射。
-- VB-CABLE 只是可选的语音路由方案。只有用户明确点击并确认 UAC 后，才会通过 `runas` 启动 VB-Audio 官方安装器；程序自身不会提权，也不会修改系统默认输入/输出设备。
+- VB-CABLE 只是可选的语音路由方案。只有用户明确点击并确认 UAC 后，才会通过 `runas` 启动 VB-Audio 官方安装器；常驻程序不会提权，也不会修改系统默认输入/输出设备。
 
 ## 运行架构
 
@@ -331,15 +356,11 @@ $env:PYTHONPATH = Join-Path (Get-Location) 'src'
 
 该脚本会把固定版本、固定 SHA-256 的压缩资产放到被 `.gitignore` 忽略的
 `src\ovb_rc003\frida_assets`；PyInstaller 只在该文件存在时把它带入候选产物。
-运行桥接时 tap 会验证资产，定位 RC003 的 WUDFHost，并只在当前进程已有管理员权限时
-尝试注入；普通启动不会弹出提权提示，权限不足只会让 tap 不可用，不会阻止 BLE、普通
-按键或语音链路启动。需要 tap 时可在管理员 PowerShell 中启动：
-
-```powershell
-$root = (Get-Location).Path
-Start-Process -Verb RunAs -FilePath (Join-Path $root '.venv\Scripts\python.exe') `
-  -WorkingDirectory $root -ArgumentList '-m', 'ovb_rc003'
-```
+运行桥接时 tap 会验证资产并定位 RC001/RC003 的 WUDFHost；普通启动不会弹出提权
+提示，权限不足也不会阻止 BLE、Raw Input 普通按键或语音链路启动。需要返回键旁路时，
+在“权限”页明确点击“启用返回键（UAC）”：短时助手会再次核对目标 WUDFHost 与
+Gadget SHA-256，加载后立即退出，桥接通过本机回环 socket 接收报告。Windows 或蓝牙
+HID 服务重启后需要重新点击启用。
 
 构建脚本会先执行公开边界检查，再构建 PyInstaller 目录、便携版 ZIP、Inno Setup
 安装器和 `SHA256SUMS.txt`。安装器的编译需要 Windows 上可用的 Inno Setup；VB-CABLE
@@ -423,7 +444,7 @@ Windows GitHub Actions 工作流位于 `.github/workflows/windows-rc003-ci.yml`�
 
 - 当前版本未签名，首次运行可能触发 SmartScreen 提示，属预期行为。
 - Frida Gadget 是可选的第三方二进制；没有执行显式获取脚本时，缺失 usages
-  不会被猜测或伪造。执行脚本、从管理员终端启动后，还必须在日志中看到 tap ready 和
+  不会被猜测或伪造。点击“启用返回键（UAC）”后，还必须在日志中看到 tap ready 和
   真实按键边沿。
 - VB-CABLE 是可选的语音路由方案；未安装时语音默认没有虚拟麦克风路由，需要
   用户自行配置输出端点。

@@ -40,7 +40,7 @@ class AmbiguousDevicePathError(HidIdentityError):
 
     def __init__(self, count: int):
         super().__init__(
-            f"{count} RC003 HID device paths found; keep only one connected and retry"
+            f"{count} RC001/RC003 HID device paths found; keep only one connected and retry"
         )
         self.count = count
 
@@ -55,7 +55,7 @@ def select_single_device_path(paths: Sequence[str]) -> str:
 
     matches = [path for path in paths if device_path_matches_rc003(path)]
     if not matches:
-        raise NoDevicePathFoundError("no RC003 HID device path was found")
+        raise NoDevicePathFoundError("no RC001/RC003 HID device path was found")
     if len(matches) > 1:
         raise AmbiguousDevicePathError(len(matches))
     return matches[0]

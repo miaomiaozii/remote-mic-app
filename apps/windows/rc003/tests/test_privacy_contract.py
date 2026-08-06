@@ -43,15 +43,12 @@ _ELEVATION_MARKERS = (
 
 _FORBIDDEN_BINARY_SUFFIXES = (".exe", ".dll", ".pyd", ".zip", ".xz")
 
-# The SOLE, disclosed exception (XRBM-031): vb_cable_bundle.py launches the
-# THIRD-PARTY vendor's own VB-CABLE setup UI with Windows' "runas"/UAC verb,
-# only from a slot reached by an explicit user click plus a separate
-# explicit confirmation - never to elevate this application's own process,
-# and never for anything but that one vendor-controlled launch. Every other
-# module in this package must stay elevation-free; see
-# test_elevation_exception_is_scoped_to_the_vendor_vb_cable_launch_only
-# below, which proves the exemption is not a blank check.
-_ELEVATION_MARKER_EXEMPT_FILENAMES = frozenset({"vb_cable_bundle.py"})
+# Two disclosed, click-only UAC boundaries are allowed: the third-party
+# VB-CABLE installer and the short-lived, hash-pinned RC001/RC003 HID helper.
+# Every normal settings/bridge module stays elevation-free.
+_ELEVATION_MARKER_EXEMPT_FILENAMES = frozenset(
+    {"vb_cable_bundle.py", "frida_hid_tap_elevation.py"}
+)
 
 # vb_cable_bundle.py/windows_diagnostics.py/qt_settings_app.py are the three
 # SANCTIONED, reviewed modules for the explicit vendor-launch/read-only-
@@ -122,6 +119,15 @@ class NoElevationOrAutoDriverTests(unittest.TestCase):
         self.assertNotIn("PrivilegesRequired=admin", text)
         self.assertNotIn("RequireAdministrator", text)
         self.assertIn('os.startfile(path, "runas"', text)
+
+    def test_hid_tap_elevation_is_scoped_to_explicit_injector_mode(self):
+        path = _PACKAGE_ROOT / "frida_hid_tap_elevation.py"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("ShellExecuteW", text)
+        self.assertIn('"runas"', text)
+        self.assertIn('"--rc003-hid-injector"', text)
+        self.assertNotIn("RequireAdministrator", text)
+        self.assertNotIn("PrivilegesRequired=admin", text)
 
     def test_no_vbcable_install_function_exists_outside_the_sanctioned_module(self):
         offenders = []

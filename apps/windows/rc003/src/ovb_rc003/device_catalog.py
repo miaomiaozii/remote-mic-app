@@ -17,7 +17,9 @@ from typing import Iterable, Mapping, Optional, Tuple
 from . import audio_output, resources
 
 RC003_ID = "xiaomi-rc003"
+RC001_ID = "xiaomi-rc001"
 DJI_MIC_2_ID = "dji-mic-2"
+XIAOMI_REMOTE_IDS = frozenset((RC001_ID, RC003_ID))
 
 _VALID_STATUSES = frozenset(("implemented", "research", "planned", "unsupported"))
 _STATUS_ORDER = {"implemented": 0, "research": 1, "planned": 2, "unsupported": 3}
@@ -357,6 +359,18 @@ def normalize_device_id(value: object) -> str:
 
     candidate = str(value or "").strip()
     return candidate if candidate in DEVICE_PROFILE_BY_ID else RC003_ID
+
+
+def is_xiaomi_remote_device(device_id: object) -> bool:
+    """Return whether a selected catalog entry uses the Xiaomi ATVV/HID backend.
+
+    RC001 and RC003 intentionally have separate presentation profiles, while
+    sharing the same Windows hardware identity and transport implementation.
+    Keeping this decision in one helper prevents UI/entrypoint routing from
+    drifting back to an RC003-only equality check.
+    """
+
+    return normalize_device_id(device_id) in XIAOMI_REMOTE_IDS
 
 
 def profile_for(device_id: object) -> DeviceUiProfile:
